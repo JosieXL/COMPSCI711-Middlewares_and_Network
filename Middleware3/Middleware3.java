@@ -18,7 +18,8 @@ public class Middleware3 {
 	private static JTextArea textAreaSendList, textAreaReceivedList, textAreaReadyList;
 	private static JButton jbSend;    private ArrayList<String> holdingQueue = new ArrayList<>();
     private int receivedMessageNumber = 0;
-    private int sendMessageNumber = 0;
+    private int sendMessageNumber = 1;
+    private static boolean isReceivedMessage = false;
 
 
 	public static void main(String[] args) {
@@ -145,119 +146,152 @@ public class Middleware3 {
         jbSend.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                sendMessageToNetwork();
+                String messageSend = "Msg #" + sendMessageNumber + " from Middleware 3 <EOM>";
+                sendMessageToNetwork(messageSend);
+                textAreaSendList.append(messageSend);
+                textAreaSendList.append("\n");
                 sendMessageNumber += 1;
-                System.out.println("success send the info message request to server");
-                System.out.println("click on get info button");
-
-                //displayMessage();
-                
+                System.out.println("click on button");
             }
         });
 
         while (true) {
+            isReceivedMessage = false;
             System.out.println("displaying info...");
-            String messageFromNetwork = getMessageFromNetwork();
-            textAreaReceivedList.append(messageFromNetwork);
-            textAreaReceivedList.append("\n");
+            String messageFromNetwork = getMessage();
+            if (messageFromNetwork.contains("Msg")) {
+                isReceivedMessage = true;
+                textAreaReceivedList.append(messageFromNetwork);
+                textAreaReceivedList.append("\n");
 
-            //original: Msg #1 from Middleware 1 <EOM>
-            //now: Msg #1 from Middleware 1 timestamp x <EOM>
-            String addTimestamp1 = "timestamp " + Integer.toString(receivedMessageNumber) + " ";
-            String EOM = messageFromNetwork.substring(messageFromNetwork.length()-5);
-            int signIndex = messageFromNetwork.indexOf("<");
-            String firstPart = messageFromNetwork.substring(0, signIndex);
-            System.out.println(EOM);
-            System.out.println(firstPart);
-            String result1 = firstPart + addTimestamp1 + EOM;
-            System.out.println(result1);
-            holdingQueue.add(result1);
-            System.out.println("holdingQueue1: "+ holdingQueue); 
-            receivedMessageNumber += 1;
-            System.out.println("success display the contents");
-            /*
-            if (messageFromNetwork.contains("Middleware 3")) {
-                int count = 0;
-                ArrayList<Integer> timestampList = new ArrayList<>();
-                timestampList.add(receivedMessageNumber);
-                // timestampList includes format each middleware's currentReceivedNumber
+                //original: Msg #1 from Middleware 1 <EOM>
+                //now: Msg #1 from Middleware 1 timestamp x <EOM>
+                String addTimestamp1 = "timestamp " + Integer.toString(receivedMessageNumber) + " ";
+                String EOM = messageFromNetwork.substring(messageFromNetwork.length()-5);
+                int signIndex = messageFromNetwork.indexOf("<");
+                String firstPart = messageFromNetwork.substring(0, signIndex);
+                String result1 = firstPart + addTimestamp1 + EOM;
+                System.out.println(result1);
+                holdingQueue.add(result1);
+                System.out.println("holdingQueue1: "+ holdingQueue); 
+                receivedMessageNumber += 1;
+                System.out.println("success display the contents");
+            
+                if (isReceivedMessage == true) {
+                    if (messageFromNetwork.contains("Middleware 1")) {
+                        String requestMessage = "Please send the timestamp";
+                        String messageMatch = getMessage();
+                        System.out.println(messageMatch);
+                        if (messageMatch.equals( requestMessage)) {
+                            System.out.println("request message matched.");
+                            sendTimestampToM1();
+                            String updatedMessage = getMessage();
+                            System.out.println("updatedMessage: " + updatedMessage);
+                            if (updatedMessage.contains("*")) {
+                                updateHoldingQueue(updatedMessage);
+                            }
+                        }
+                        System.out.println("holdingQueue: "+ holdingQueue); 
+                    }
+                    else if (messageFromNetwork.contains("Middleware 2")) {
+                        String requestMessage = "Please send the timestamp";
+                        String messageMatch = getMessage();
+                        System.out.println(messageMatch);
+                        if (messageMatch.equals( requestMessage)) {
+                            System.out.println("request message matched.");
+                            sendTimestampToM2();
+                            String updatedMessage = getMessage();
+                            System.out.println("updatedMessage: " + updatedMessage);
+                            if (updatedMessage.contains("*")) {
+                                updateHoldingQueue(updatedMessage);
+                            }
+                        }
+                        System.out.println("holdingQueue: "+ holdingQueue); 
+                    }
+                    else if (messageFromNetwork.contains("Middleware 3")) {
+                        int count = 0;
+                        ArrayList<Integer> timestampList = new ArrayList<>();
+                        timestampList.add(receivedMessageNumber);
+                        // timestampList includes format each middleware's currentReceivedNumber
+                        
+                        try {
+                            System.out.println("Sleeping...");
+                            Thread.sleep(20000);
+                            System.out.println("Sleeping end...");
+                        }
+                        catch(Exception ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                        
 
-                while (count < 4) {
-                    String timeStamp = getTimestampFromOtherMiddleware();
-                    timestampList.add(Integer.parseInt(timeStamp));
-                    count++;
-                }
-                Integer max = Collections.max(timestampList);
-                System.out.println(max);
-                String addTimestamp = "timestamp " + Integer.toString(max) + " ";
-                System.out.println(EOM);
-                System.out.println(firstPart);
-                String result = firstPart + addTimestamp + EOM + "*";
-                System.out.println(result);
-                sendAgreedTimeStampToOtherMiddleware(result);
-                //original: Msg #1 from Middleware 1 timestamp x <EOM>
-                //updated: Msg #1 from Middleware 1 timestamp 3 <EOM>*
+                        sendRequestTimestampToMiddleware();
+                        ServerSocket serverSocket;
+                        try {
+                            serverSocket = new ServerSocket(8084);
+                            while (count < 4) {
+                                int[] TSC = getTimestampFromOtherMiddleware(count, serverSocket);
+                                int timeStamp = TSC[0];
+                                count = TSC[1];
+                                timestampList.add(timeStamp);
+                            }
+                        } catch (Exception e1) {
+                            e1.printStackTrace();
+                        }
 
-                for (int i=0; i<holdingQueue.size(); i++) {
-                    if (holdingQueue.get(i).equals(messageFromNetwork)) {
-                        holdingQueue.set(i, result);
+                        Integer max = Collections.max(timestampList);
+                        String addTimestamp = "timestamp " + Integer.toString(max) + " ";
+                        //original: Msg #1 from Middleware 1 timestamp x <EOM>
+                        //updated: Msg #1 from Middleware 1 timestamp 3 <EOM>*
+                        String updatedMessage = firstPart + addTimestamp + EOM + "*";
+                        System.out.println(updatedMessage);
+
+                        sendAgreedTimeStampToOtherMiddleware(updatedMessage);
+                        
+                        updateHoldingQueue(updatedMessage);
+                        System.out.println("holdingQueue: "+ holdingQueue);  
                     }
+                    else if (messageFromNetwork.contains("Middleware 4")) {
+                        String requestMessage = "Please send the timestamp";
+                        String messageMatch = getMessage();
+                        System.out.println(messageMatch);
+                        if (messageMatch.equals( requestMessage)) {
+                            System.out.println("request message matched.");
+                            sendTimestampToM4();
+                            String updatedMessage = getMessage();
+                            System.out.println("updatedMessage: " + updatedMessage);
+                            if (updatedMessage.contains("*")) {
+                                updateHoldingQueue(updatedMessage);
+                            }
+                        }
+                        System.out.println("holdingQueue: "+ holdingQueue); 
+                    }
+                    else if (messageFromNetwork.contains("Middleware 5")) {
+                        String requestMessage = "Please send the timestamp";
+                        String messageMatch = getMessage();
+                        System.out.println(messageMatch);
+                        if (messageMatch.equals( requestMessage)) {
+                            System.out.println("request message matched.");
+                            sendTimestampToM5();
+                            String updatedMessage = getMessage();
+                            System.out.println("updatedMessage: " + updatedMessage);
+                            if (updatedMessage.contains("*")) {
+                                updateHoldingQueue(updatedMessage);
+                            }
+                        }
+                        System.out.println("holdingQueue: "+ holdingQueue); 
+                    }  
+
                 }
-                System.out.println("holdingQueue: "+ holdingQueue);  
+                if (holdingQueue.size() != 0) {
+                    resortHoldingQueue();
+                    ifReadyMessage();
+                }
             }
-            else if (messageFromNetwork.contains("Middleware 2")) {
-                sendTimestampToM2();
-                String updatedMessage = getTimestampFromOtherMiddleware();
-                System.out.println(updatedMessage);
-                for (int i=0; i<holdingQueue.size(); i++) {
-                    if (holdingQueue.get(i).equals(messageFromNetwork)) {
-                        holdingQueue.set(i, updatedMessage);
-                    }
-                }
-                System.out.println("holdingQueue: "+ holdingQueue); 
-            } 
-            else if (messageFromNetwork.contains("Middleware 1")) {
-                sendTimestampToM1();
-                String updatedMessage = getTimestampFromOtherMiddleware();
-                System.out.println(updatedMessage);
-                for (int i=0; i<holdingQueue.size(); i++) {
-                    if (holdingQueue.get(i).equals(messageFromNetwork)) {
-                        holdingQueue.set(i, updatedMessage);
-                    }
-                }
-                System.out.println("holdingQueue: "+ holdingQueue); 
-            } 
-            else if (messageFromNetwork.contains("Middleware 4")) {
-                sendTimestampToM4();
-                String updatedMessage = getTimestampFromOtherMiddleware();
-                System.out.println(updatedMessage);
-                for (int i=0; i<holdingQueue.size(); i++) {
-                    if (holdingQueue.get(i).equals(messageFromNetwork)) {
-                        holdingQueue.set(i, updatedMessage);
-                    }
-                }
-                System.out.println("holdingQueue: "+ holdingQueue); 
-            }
-            else if (messageFromNetwork.contains("Middleware 5")) {
-                sendTimestampToM5();
-                String updatedMessage = getTimestampFromOtherMiddleware();
-                System.out.println(updatedMessage);
-                for (int i=0; i<holdingQueue.size(); i++) {
-                    if (holdingQueue.get(i).equals(messageFromNetwork)) {
-                        holdingQueue.set(i, updatedMessage);
-                    }
-                }
-                System.out.println("holdingQueue: "+ holdingQueue); 
-            }
-            resortHoldingQueue();
-            ifReadyMessage();
-            */
         }
 
     }
 
-    public void sendMessageToNetwork() {
-        String messageM3 = "Msg #" + sendMessageNumber + " from Middleware 3 <EOM>";
+    private void sendMessageToNetwork(String messageSend) {
         try {
             InetAddress inetAddress = InetAddress.getLocalHost();
             Socket socket = new Socket(inetAddress, 8081);
@@ -266,9 +300,7 @@ public class Middleware3 {
             OutputStream outputStreamFromSocket = socket.getOutputStream();
             DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
             System.out.println("Sending string to the Network.");
-            dataOutputStreamToServer.writeUTF(messageM3);
-            textAreaSendList.append(messageM3);
-            textAreaSendList.append("\n");
+            dataOutputStreamToServer.writeUTF(messageSend);
             dataOutputStreamToServer.flush();
             dataOutputStreamToServer.close();
             System.out.println("socket 8081 is closing...");
@@ -279,7 +311,7 @@ public class Middleware3 {
         }
     }
 
-    private static String getMessageFromNetwork() {
+    private static String getMessage() {
         String requestMessage = "";
         try {
             ServerSocket serverSocket = new ServerSocket(8084);
@@ -290,7 +322,7 @@ public class Middleware3 {
             InputStream inputStream = socket.getInputStream();
             DataInputStream dataInputStreamFromClient = new DataInputStream(inputStream);
             requestMessage = dataInputStreamFromClient.readUTF();
-            System.out.println("The message sent from the network was: " + requestMessage);
+            System.out.println("The message sent was: " + requestMessage);
             System.out.println("Closing socket 8084.");
             serverSocket.close();
             socket.close();
@@ -302,16 +334,217 @@ public class Middleware3 {
         return requestMessage;
     }
 
-    public void displayMessage() {
-        System.out.println("displaying info...");
-        String messageFromNetwork = getMessageFromNetwork();
-        textAreaReceivedList.append(messageFromNetwork);
-        textAreaReceivedList.append("\n");
-        textAreaReceivedList.append("...");
-        textAreaReceivedList.append("\n");
+    private void sendTimestampToM1() {
+        try {
+            InetAddress inetAddress = InetAddress.getLocalHost();
+            Socket socket = new Socket(inetAddress, 8082);
+            System.out.println("sendTimestampToM1 socket 8082 Connected!");
+            OutputStream outputStreamFromSocket = socket.getOutputStream();
+            DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+            System.out.println("Sending int...");
+            dataOutputStreamToServer.writeInt(receivedMessageNumber);
+            dataOutputStreamToServer.flush();
+            System.out.println("finish sending int...");
+            //dataOutputStreamToServer.close();
+            //System.out.println("socket 8082 is closing...");
+            //socket.close();
+            //socket.shutdownOutput();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
+    private void sendTimestampToM2() {
+        try {
+            InetAddress inetAddress = InetAddress.getLocalHost();
+            Socket socket = new Socket(inetAddress, 8083);
+            System.out.println("sendTimestampToM1 socket 8083 Connected!");
+            OutputStream outputStreamFromSocket = socket.getOutputStream();
+            DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+            System.out.println("Sending int...");
+            dataOutputStreamToServer.writeInt(receivedMessageNumber);
+            dataOutputStreamToServer.flush();
+            System.out.println("finish sending int...");
+            //dataOutputStreamToServer.close();
+            //System.out.println("socket 8083 is closing...");
+            //socket.close();
+            //socket.shutdownOutput();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
+    private void sendTimestampToM4() {
+        try {
+            InetAddress inetAddress = InetAddress.getLocalHost();
+            Socket socket = new Socket(inetAddress, 8085);
+            System.out.println("sendTimestampToM4 socket 8085 Connected!");
+            OutputStream outputStreamFromSocket = socket.getOutputStream();
+            DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+            System.out.println("Sending int...");
+            dataOutputStreamToServer.writeInt(receivedMessageNumber);
+            dataOutputStreamToServer.flush();
+            System.out.println("finish sending int...");
+            //dataOutputStreamToServer.close();
+            //System.out.println("socket 8082 is closing...");
+            //socket.close();
+            //socket.shutdownOutput();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendTimestampToM5() {
+        try {
+            InetAddress inetAddress = InetAddress.getLocalHost();
+            Socket socket = new Socket(inetAddress, 8086);
+            System.out.println("sendTimestampToM5 socket 8086 Connected!");
+            OutputStream outputStreamFromSocket = socket.getOutputStream();
+            DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+            System.out.println("Sending int...");
+            dataOutputStreamToServer.writeInt(receivedMessageNumber);
+            dataOutputStreamToServer.flush();
+            System.out.println("finish sending int...");
+            //dataOutputStreamToServer.close();
+            //System.out.println("socket 8082 is closing...");
+            //socket.close();
+            //socket.shutdownOutput();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static int[] getTimestampFromOtherMiddleware(int count, ServerSocket serverSocket) {
+        int t = 0;
+        int[] output = new int[2];
+        try {
+            //ServerSocket serverSocket = new ServerSocket(8082);
+            //serverSocket.setSoTimeout(10000);
+            System.out.println("ServerSocket 8084 connections...");
+            Socket socket = serverSocket.accept();
+            System.out.println("Connection from " + socket + "!");
+            InputStream inputStream = socket.getInputStream();
+            DataInputStream dataInputStreamFromMiddleware = new DataInputStream(inputStream);
+            t = dataInputStreamFromMiddleware.readInt();
+            System.out.println("The TS sent from the network was: " + t);
+            count++;
+            output[0] = t;
+            output[1] = count;
+            //System.out.println("Closing socket 8082.");
+            //serverSocket.close();
+            //socket.close();
+            
+        }
+        catch (Exception e) {
+            //return "";
+            e.printStackTrace();
+        }
+        return output;
+    }
+
+    private void sendAgreedTimeStampToOtherMiddleware(String agreedTimestampString) {
+        int[] otherMiddlewarePorts = { 8082, 8083, 8085, 8086 };
+        try {
+            for (int i=0; i<otherMiddlewarePorts.length; i++) {
+                InetAddress inetAddress = InetAddress.getLocalHost();
+                Socket socket = new Socket(inetAddress, otherMiddlewarePorts[i]);
+                System.out.println("sendRequestInfoToServer socket " + otherMiddlewarePorts[i] + " Connected!");
+                System.out.println("Sending string to the middleware " + (i+2));
+                OutputStream outputStreamFromSocket = socket.getOutputStream();
+                DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+                System.out.println("Sending string to the middleware " + (i+2));
+                dataOutputStreamToServer.writeUTF(agreedTimestampString);
+                dataOutputStreamToServer.flush();
+                dataOutputStreamToServer.close();
+                System.out.println("socket " + otherMiddlewarePorts[i] + " is closing...");
+                socket.close();
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendRequestTimestampToMiddleware() {
+        int[] otherMiddlewarePorts = { 8082, 8083, 8085, 8086 };
+        try {
+            for (int i=0; i<otherMiddlewarePorts.length; i++) {
+                InetAddress inetAddress = InetAddress.getLocalHost();
+                Socket socket = new Socket(inetAddress, otherMiddlewarePorts[i]);
+                System.out.println("sendRequestTimestampToMiddleware socket " + otherMiddlewarePorts[i] + " Connected!");
+                System.out.println("Sending string to the middleware " + (i+2));
+                OutputStream outputStreamFromSocket = socket.getOutputStream();
+                DataOutputStream dataOutputStreamToServer = new DataOutputStream(outputStreamFromSocket);
+                System.out.println("Sending string to the middleware " + (i+2));
+                dataOutputStreamToServer.writeUTF("Please send the timestamp");
+                dataOutputStreamToServer.flush();
+                dataOutputStreamToServer.close();
+                System.out.println("socket " + otherMiddlewarePorts[i] + " is closing...");
+                socket.close();
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    //original: Msg #1 from Middleware 1 timestamp x <EOM>
+    //updated: Msg #1 from Middleware 1 timestamp 3 <EOM>*
+    private void updateHoldingQueue(String updatedMessage) {
+        for (int i=0; i<holdingQueue.size(); i++) {
+            String messageNo = holdingQueue.get(i).substring(holdingQueue.get(i).indexOf("#")+1, holdingQueue.get(i).indexOf("from")-1);
+            String updateMessageNo = updatedMessage.substring(updatedMessage.indexOf("#")+1, updatedMessage.indexOf("from")-1);
+            String middlewareNo = holdingQueue.get(i).substring(holdingQueue.get(i).indexOf("ware")+5, holdingQueue.get(i).indexOf("time")-1);
+            String updateMessageMiddlewareNo = updatedMessage.substring(updatedMessage.indexOf("ware")+5, updatedMessage.indexOf("time")-1);
+            System.out.println(middlewareNo);
+            if ((messageNo.equals(updateMessageNo)) && (middlewareNo.equals(updateMessageMiddlewareNo))) {
+                holdingQueue.set(i, updatedMessage);
+            }
+        }
+    }
+
+    // resort holding queue - the smallest timestamp is the first, if the timestamp are equal, the smallest middleware ID is the first one.
+    private void resortHoldingQueue() {
+        for (int i=0; i<holdingQueue.size(); i++){
+            int timestamp = Integer.parseInt(holdingQueue.get(i).substring(holdingQueue.get(i).indexOf("stamp")+6, holdingQueue.get(i).indexOf("<")-1));
+            int middlewareId = Integer.parseInt(holdingQueue.get(i).substring(holdingQueue.get(i).indexOf("ware")+5, holdingQueue.get(i).indexOf("time")-1));
+            System.out.println(timestamp);
+            System.out.println(middlewareId);
+
+            
+            for (int j=0; j<holdingQueue.size(); j++) {
+                int timestamp1 = Integer.parseInt(holdingQueue.get(j).substring(holdingQueue.get(j).indexOf("stamp")+6, holdingQueue.get(j).indexOf("<")-1));
+                int middlewareId1 = Integer.parseInt(holdingQueue.get(j).substring(holdingQueue.get(j).indexOf("ware")+5, holdingQueue.get(j).indexOf("time")-1));
+                if (timestamp < timestamp1){
+                    Collections.swap(holdingQueue, i, j);
+                }
+                else if (timestamp == timestamp1) {
+                    if (middlewareId < middlewareId1){
+                        Collections.swap(holdingQueue, i, j);
+                    }
+                }
+                
+            }
+
+        }
+    }
+
+    private void ifReadyMessage() {
+        //message被updated过[在message后面加个*]，message在holdingQueue的第一位=>从holdingQueue中删除，readyList中append
+        String finalCharForFirstElementOfList = holdingQueue.get(0).substring(holdingQueue.get(0).length() - 1);
+        System.out.println(finalCharForFirstElementOfList);
+        if (finalCharForFirstElementOfList.equals("*")){
+            System.out.println("!");
+            textAreaReadyList.append(holdingQueue.get(0));
+            textAreaReadyList.append("\n");
+            holdingQueue.remove(0);
+        }
+    }
+    
 }
 
 
